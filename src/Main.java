@@ -6,11 +6,16 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Timer;
 
 public class Main {
-    public static Instant startTime;
+    public static long startTime;
     public static List<String> all = new ArrayList<>();
     public static List<String> allUntouched = new ArrayList<>();
+    public static boolean autoPlay = false;
+    public static String nextGuess;
+    public static String defaultGuess = "crane";
+    public static WordleHandler wordleHandler;
     public static String lower = "qwertyuiopasdfghjklzxcvbnm";
     public static String upper = "QWERTYUIOPASDFGHJKLZXCVBNM";
     public static List<CharacterScore> scores = new ArrayList<>();
@@ -21,7 +26,10 @@ public class Main {
     public static List<String> unused = new ArrayList<>();
     public static List<SomewhereLetterPos> used = new ArrayList<>();
     public static void main(String[] args) throws IOException {
-        startTime = Instant.now();
+        if (autoPlay) {
+            LOW_MODE_THRESHOLD = 1;
+        }
+        startTime = System.nanoTime();
         Util.print("Starting wordle solver!");
         Util.print("Enter correct letters as capitals, used letters as lowercase and non correct with a - before");
         Util.print("Reading possible words..");
@@ -38,15 +46,24 @@ public class Main {
         }
         Util.print("Successfully read " + all.size() + " words");
         allUntouched.addAll(all);
+        if (autoPlay) {
+            wordleHandler = new WordleHandler(all);
+        }
         answer = new Answer();
         Util.print("Calculating letter scores..");
         calculateNumberScores();
         Util.print("Done!");
+        if (autoPlay) nextGuess = tryGuess(defaultGuess);
         while (true) {
+            String input = "";
             Util.print("Awaiting word input");
-            BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(System.in));
-            String input = reader.readLine();
+            if (!autoPlay) {
+                BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(System.in));
+                input = reader.readLine();
+            } else {
+                input = getGuess();
+            }
             Util.print("Parsing input");
             if (input.equalsIgnoreCase("reset")) {
                 reset();
@@ -93,8 +110,14 @@ public class Main {
             if (all.size() <= MAX_WORDS_TO_SHOW) {
                 Util.print(all);
             }
+            if (autoPlay && all.size() == 1) {
+                guess(all.get(0));
+            }
             suggestGoodAnswer();
         }
+    }
+    public static String getGuess() {
+        return nextGuess;
     }
     public static void calculateNumberScores() {
         scores.clear();
@@ -170,11 +193,19 @@ public class Main {
             if (goods.size() > 1) {
                 String good = getBestCharacterScore(goods);
                 Util.print("Found HIGH good answer : " + good);
+                guess(good);
                 return;
             }
             if (attemptFind == 1) return;
             attemptFind--;
         }
+    }
+    public static String tryGuess(String guess) {
+        return wordleHandler.guess(guess);
+    }
+    public static void guess(String guess) {
+        if (!autoPlay) return;
+        nextGuess = wordleHandler.guess(guess);
     }
     public static int calculateCharScore(String str) {
         int score = 0;
@@ -219,6 +250,7 @@ public class Main {
                 for (String str : goods) {
                     maxCount ++;
                     Util.print("Found LOW good answer : " + str);
+                    guess(str);
                     if (maxCount > 20) return;
                 }
                 return;
